@@ -69,3 +69,17 @@ injetam esse adapter para não depender de uma API em execução.
 
 Os modelos das telas são DTOs de apresentação. O Front não acessa tabelas ou
 entidades do EF diretamente. O catálogo da API substitui o catálogo de preview.
+
+## Configuração local e segredos
+
+Copie `.env.example` para `.env` uma vez. Para carregar essa configuração no web:
+
+```sh
+flutter run -d chrome --web-hostname localhost --web-port 5173 --dart-define-from-file=.env
+```
+
+O `.env` é ignorado pelo Git; apenas `.env.example` é versionado. Valores de
+`dart-define` são compilados no aplicativo, portanto somente URL pública da API e
+opções de execução devem entrar aqui. Tokens privados e chaves de servidor ficam
+exclusivamente no Back. Para Android emulador, ajuste API_BASE_URL para
+http://10.0.2.2:5013 quando usar esse arquivo. Sem o arquivo, o padrão é automático.
