@@ -1,40 +1,71 @@
 # Integração do Front — Fase 1
 
-O Front está em `lib/features/workout/presentation`. A aplicação recebe um
-`WorkoutGateway` em `MoveUpApp(gateway: ...)` (`lib/core/app.dart`).
+## Implementação ativa
 
-Implemente o contrato de `lib/features/workout/domain/workout_gateway.dart` usando
-seus repositories/UseCases. Os modelos desse arquivo são DTOs do Front: não é
-necessário usar os mesmos nomes ou tipos nas tabelas do banco.
+`MoveUpApp` usa `ApiWorkoutGateway`, em
+`lib/features/workout/data/api_workout_gateway.dart`, que implementa o contrato
+`WorkoutGateway` em `lib/features/workout/domain/workout_gateway.dart`.
 
-- `loadWorkouts()`: listar fichas completas, incluindo os exercícios configurados.
-- `loadExercises()`: listar catálogo com ID, nome e grupo muscular.
-- `saveWorkout(plan)`: criar ou atualizar pelo ID, salvando ficha e seus itens em
-  uma transação. A posição em `items` é a ordem dos exercícios. Remover vínculos
-  antigos que não existirem mais na ficha editada.
-- `deleteWorkout(id)`: excluir ficha e seus vínculos, sem excluir o catálogo.
+A API está em `../MoveUp`: ASP.NET Core + EF Core + SQLite. O banco é armazenado
+na máquina da API. O Front precisa de conexão com ela; armazenamento offline no
+celular com Drift não faz parte desta implementação.
 
-IDs no contrato são strings. O Front gera o ID de uma ficha nova; o adapter pode
-mapear esse ID se o banco usar outro formato. Dia da semana: 1 = segunda, 7 = domingo.
-Carga em kg (double); descanso em segundos (int). Zero é aceito para carga e
- descanso; séries/repetições devem ser inteiros positivos. Nome e dia obrigatórios;
-a ficha deve conter pelo menos um exercício.
+## Rodar em desenvolvimento
 
-O adapter pode lançar exceções: as telas mostram erro, permitem tentar novamente
-e mantêm o formulário após falha de gravação. Cada operação deve terminar somente
-quando a gravação tiver sido concluída. Garanta as mesmas validações no Back.
+1. Em `../MoveUp`, executar `dotnet run --launch-profile http`.
+2. Aqui, executar `flutter run -d chrome --web-hostname localhost --web-port 5173`.
+3. Criar uma ficha, recarregar o app e confirmar que os dados continuam presentes.
 
-## Adapter temporário
+Por padrão a URL é `http://localhost:5013`, ou `http://10.0.2.2:5013` no emulador
+Android. Para outro host, passar `--dart-define=API_BASE_URL=https://seu-host`.
+Android debug permite HTTP local; builds de produção devem usar HTTPS. Aparelhos
+físicos precisam de um endereço de rede acessível. A API permite CORS da porta
+5173 em localhost/127.0.0.1; outras origens exigem configuração no Back.
 
-`PreviewWorkoutGateway` fornece um catálogo de demonstração e guarda fichas apenas
-em memória. Não há persistência após reiniciar. Substitua a instância padrão em
-`lib/core/app.dart` pelo seu adapter para concluir a integração com SQLite/Drift.
-Nenhuma dependência de banco foi adicionada pelo Front.
+## Mapeamento
 
-## Entregas
+| Contrato do Front | API |
+|---|---|
+| `loadWorkouts()` | `GET /api/treinos` |
+| `loadExercises()` | `GET /api/exercicios` |
+| `saveWorkout(plan)` | `PUT /api/treinos/{uuid}` |
+| `deleteWorkout(id)` | `DELETE /api/treinos/{uuid}` |
 
-FRONT-01 a FRONT-10: estrutura por feature, Home, Meus Treinos, cadastro, seleção
-com busca/filtro, configuração/ordenação/remoção de exercícios, revisão, detalhes,
-edição e exclusão com confirmação. Layout responsivo, carregamento, estados vazios,
-erros e proteção contra descarte acidental. Calendário, login e execução de
-sessões ficam fora desta fase.
+O adapter converte os campos em português da API para os modelos das telas e
+ordena os exercícios por `ordem`. A ordem de envio é a posição na lista `items`.
+A API retorna o exercício completo em cada vínculo. `descricao: null` vira texto
+vazio no Front; carga é convertida para double.
+
+Uma ficha nova recebe UUID v4 uma única vez ao abrir o formulário. Salvar novamente
+com esse ID atualiza a mesma ficha. Essa estratégia permite repetir uma gravação
+quando a resposta se perder sem criar uma segunda ficha. Registros antigos do
+adapter temporário em memória não são migrados.
+
+Os métodos só completam após a resposta da API; erros são propagados para os
+estados de erro existentes nas telas. O formulário permanece aberto se salvar
+falhar. O cliente tem timeout de 15 segundos.
+
+## Regras compartilhadas
+
+Dia de 1 (segunda) a 7 (domingo). Nome e pelo menos um exercício obrigatórios.
+Séries/repetições inteiras positivas; carga finita em kg e descanso inteiro em
+segundos, ambos maiores ou iguais a zero. A API também verifica existência e
+unicidade dos exercícios e limites de texto.
+
+## Demonstração isolada
+
+`flutter run --dart-define=USE_PREVIEW=true` usa `PreviewWorkoutGateway`.
+Esse modo é opcional e mantém os dados somente em memória. Os testes de widgets
+injetam esse adapter para não depender de uma API em execução.
+
+## Verificação
+
+- `flutter test`: fluxo visual e contrato do adapter HTTP.
+- `flutter analyze`: análise estática.
+- `dart run tool/check_api.dart http://localhost:5013`: integração real, criando,
+  consultando, editando e excluindo uma ficha temporária.
+- `dotnet test tests/MoveUp.Tests.csproj`, no Back: persistência, validações,
+  integridade, transação, reinício, catálogo, rotas e CORS.
+
+Os modelos das telas são DTOs de apresentação. O Front não acessa tabelas ou
+entidades do EF diretamente. O catálogo da API substitui o catálogo de preview.

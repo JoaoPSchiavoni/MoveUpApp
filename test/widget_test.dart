@@ -74,7 +74,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(const MoveUpApp());
+    await tester.pumpWidget(MoveUpApp(gateway: PreviewWorkoutGateway()));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await tester.tap(find.text('Novo treino'));

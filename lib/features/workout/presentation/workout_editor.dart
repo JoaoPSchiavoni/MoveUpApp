@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 import '../domain/workout_gateway.dart';
 import 'workout_home.dart' show WorkoutSummary;
@@ -21,8 +22,7 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
     text: widget.initial?.description,
   );
   late int? weekday = widget.initial?.weekday;
-  late final String id =
-      widget.initial?.id ?? DateTime.now().microsecondsSinceEpoch.toString();
+  late final String id = widget.initial?.id ?? const Uuid().v4();
   final selected = <ExerciseDraft>[];
   List<ExerciseOption> exercises = [];
   bool selectionInvalid = false;
