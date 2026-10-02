@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../domain/workout_gateway.dart';
 import 'workout_editor.dart';
+import '../../session/presentation/session_store.dart';
+import '../../session/presentation/session_page.dart';
+import '../../session/presentation/session_history.dart';
 
 class WorkoutHome extends StatefulWidget {
-  const WorkoutHome({super.key, required this.gateway});
+  const WorkoutHome({super.key, required this.gateway, required this.sessions});
   final WorkoutGateway gateway;
+  final SessionStore sessions;
   @override
   State<WorkoutHome> createState() => _WorkoutHomeState();
 }
@@ -18,6 +22,7 @@ class _WorkoutHomeState extends State<WorkoutHome> {
   @override
   void initState() {
     super.initState();
+    widget.sessions.refresh();
     reload();
   }
 
@@ -54,8 +59,11 @@ class _WorkoutHomeState extends State<WorkoutHome> {
   Future<void> details(WorkoutPlan workout) async {
     final changed = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) =>
-            WorkoutDetails(gateway: widget.gateway, workout: workout),
+        builder: (_) => WorkoutDetails(
+          gateway: widget.gateway,
+          workout: workout,
+          sessions: widget.sessions,
+        ),
       ),
     );
     if (changed == true && mounted) await reload();
@@ -89,138 +97,165 @@ class _WorkoutHomeState extends State<WorkoutHome> {
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
-          child: loading
-              ? const Center(child: CircularProgressIndicator())
-              : error != null
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(error!),
-                      TextButton(
-                        onPressed: reload,
-                        child: const Text('Tentar novamente'),
-                      ),
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: reload,
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 100),
-                    children: [
-                      Text(
-                        tab == 0
-                            ? 'Seu próximo passo começa aqui.'
-                            : 'Meus treinos',
-                        style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        tab == 0
-                            ? 'Organize sua rotina. Treine no seu ritmo.'
-                            : 'Suas fichas, organizadas por dia da semana.',
-                      ),
-                      const SizedBox(height: 28),
-                      if (tab == 0) ...[
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: const Color(0xff193f32),
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'TREINO DE HOJE',
-                                style: TextStyle(
-                                  color: Color(0xffb8e5c6),
-                                  letterSpacing: 2,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                weekdays[DateTime.now().weekday - 1],
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              if (today.isEmpty)
-                                const Text(
-                                  'Nenhum treino definido para hoje.',
-                                  style: TextStyle(color: Colors.white70),
-                                ),
-                              for (final workout in today)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: FilledButton.tonal(
-                                    onPressed: () => details(workout),
-                                    child: Text(workout.name),
-                                  ),
-                                ),
-                              if (today.isEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 16),
-                                  child: FilledButton.tonal(
-                                    onPressed: () => edit(),
-                                    child: const Text('Criar treino'),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 28),
-                        Text(
-                          'Seus treinos',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                      if (workouts.isEmpty)
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32),
-                            child: Column(
-                              children: [
-                                const Icon(
-                                  Icons.calendar_month_outlined,
-                                  size: 48,
-                                ),
-                                const SizedBox(height: 16),
-                                const Text(
-                                  'Sua rotina começa com o primeiro treino.',
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 16),
-                                OutlinedButton(
-                                  onPressed: () => edit(),
-                                  child: const Text(
-                                    'Criar meu primeiro treino',
-                                  ),
-                                ),
-                              ],
+      body: tab == 2
+          ? SessionHistory(gateway: widget.sessions.gateway)
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 900),
+                child: loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : error != null
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(error!),
+                            TextButton(
+                              onPressed: reload,
+                              child: const Text('Tentar novamente'),
                             ),
-                          ),
+                          ],
                         ),
-                      ...workouts.map(card),
-                    ],
-                  ),
-                ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => edit(),
-        icon: const Icon(Icons.add),
-        label: const Text('Novo treino'),
-      ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () async {
+                          await Future.wait([
+                            reload(),
+                            widget.sessions.refresh(),
+                          ]);
+                        },
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(24, 20, 24, 100),
+                          children: [
+                            Text(
+                              tab == 0
+                                  ? 'Seu próximo passo começa aqui.'
+                                  : 'Meus treinos',
+                              style: Theme.of(context).textTheme.headlineMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              tab == 0
+                                  ? 'Organize sua rotina. Treine no seu ritmo.'
+                                  : 'Suas fichas, organizadas por dia da semana.',
+                            ),
+                            const SizedBox(height: 16),
+                            ActiveSessionBanner(store: widget.sessions),
+                            const SizedBox(height: 16),
+                            if (tab == 0) ...[
+                              Container(
+                                padding: const EdgeInsets.all(24),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xff193f32),
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'TREINO DE HOJE',
+                                      style: TextStyle(
+                                        color: Color(0xffb8e5c6),
+                                        letterSpacing: 2,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      weekdays[DateTime.now().weekday - 1],
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    if (today.isEmpty)
+                                      const Text(
+                                        'Nenhum treino definido para hoje.',
+                                        style: TextStyle(color: Colors.white70),
+                                      ),
+                                    for (final workout in today)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 8,
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              workout.name,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 18,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            StartSessionButton(
+                                              store: widget.sessions,
+                                              plan: workout,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    if (today.isEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 16),
+                                        child: FilledButton.tonal(
+                                          onPressed: () => edit(),
+                                          child: const Text('Criar treino'),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 28),
+                              Text(
+                                'Seus treinos',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            if (workouts.isEmpty)
+                              Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(32),
+                                  child: Column(
+                                    children: [
+                                      const Icon(
+                                        Icons.calendar_month_outlined,
+                                        size: 48,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      const Text(
+                                        'Sua rotina começa com o primeiro treino.',
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      OutlinedButton(
+                                        onPressed: () => edit(),
+                                        child: const Text(
+                                          'Criar meu primeiro treino',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ...workouts.map(card),
+                          ],
+                        ),
+                      ),
+              ),
+            ),
+      floatingActionButton: tab == 2
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => edit(),
+              icon: const Icon(Icons.add),
+              label: const Text('Novo treino'),
+            ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: tab,
         onDestinationSelected: (value) => setState(() => tab = value),
@@ -234,6 +269,7 @@ class _WorkoutHomeState extends State<WorkoutHome> {
             icon: Icon(Icons.fitness_center),
             label: 'Meus treinos',
           ),
+          NavigationDestination(icon: Icon(Icons.history), label: 'Histórico'),
         ],
       ),
     );
@@ -245,8 +281,10 @@ class WorkoutDetails extends StatefulWidget {
     super.key,
     required this.gateway,
     required this.workout,
+    required this.sessions,
   });
   final WorkoutGateway gateway;
+  final SessionStore sessions;
   final WorkoutPlan workout;
   @override
   State<WorkoutDetails> createState() => _WorkoutDetailsState();
@@ -298,7 +336,10 @@ class _WorkoutDetailsState extends State<WorkoutDetails> {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
+            ActiveSessionBanner(store: widget.sessions),
             WorkoutSummary(workout: widget.workout),
+            const SizedBox(height: 16),
+            StartSessionButton(store: widget.sessions, plan: widget.workout),
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: deleting

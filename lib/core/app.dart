@@ -6,34 +6,50 @@ import '../features/workout/data/api_workout_gateway.dart';
 import '../features/workout/domain/workout_gateway.dart';
 import '../features/workout/data/preview_workout_gateway.dart';
 import '../features/workout/presentation/workout_home.dart';
+import '../features/session/domain/session.dart';
+import '../features/session/data/api_session_gateway.dart';
+import '../features/session/data/preview_session_gateway.dart';
+import '../features/session/presentation/session_store.dart';
 
 class MoveUpApp extends StatefulWidget {
-  const MoveUpApp({super.key, this.gateway});
+  const MoveUpApp({super.key, this.gateway, this.sessionGateway});
   final WorkoutGateway? gateway;
+  final SessionGateway? sessionGateway;
   @override
   State<MoveUpApp> createState() => _MoveUpAppState();
 }
 
 class _MoveUpAppState extends State<MoveUpApp> {
   late final WorkoutGateway gateway = widget.gateway ?? _defaultGateway();
+  late final SessionGateway sessionGateway =
+      widget.sessionGateway ??
+      (gateway is PreviewWorkoutGateway
+          ? PreviewSessionGateway()
+          : ApiSessionGateway(baseUrl: _apiUrl));
+  late final SessionStore sessions = SessionStore(sessionGateway);
+  String get _apiUrl {
+    const configured = String.fromEnvironment('API_BASE_URL');
+    if (configured.isNotEmpty) return configured;
+    return !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+        ? 'http://10.0.2.2:5013'
+        : 'http://localhost:5013';
+  }
+
   WorkoutGateway _defaultGateway() {
     if (const bool.fromEnvironment('USE_PREVIEW')) {
       return PreviewWorkoutGateway();
     }
-    const configured = String.fromEnvironment('API_BASE_URL');
-    final defaultUrl =
-        !kIsWeb && defaultTargetPlatform == TargetPlatform.android
-        ? 'http://10.0.2.2:5013'
-        : 'http://localhost:5013';
-    return ApiWorkoutGateway(
-      baseUrl: configured.isEmpty ? defaultUrl : configured,
-    );
+    return ApiWorkoutGateway(baseUrl: _apiUrl);
   }
 
   @override
   void dispose() {
     if (widget.gateway == null && gateway is ApiWorkoutGateway) {
       (gateway as ApiWorkoutGateway).close();
+    }
+    sessions.dispose();
+    if (widget.sessionGateway == null && sessionGateway is ApiSessionGateway) {
+      (sessionGateway as ApiSessionGateway).close();
     }
     super.dispose();
   }
@@ -53,6 +69,6 @@ class _MoveUpAppState extends State<MoveUpApp> {
       ),
       appBarTheme: const AppBarTheme(backgroundColor: Color(0xfff6f7f3)),
     ),
-    home: WorkoutHome(gateway: gateway),
+    home: WorkoutHome(gateway: gateway, sessions: sessions),
   );
 }
