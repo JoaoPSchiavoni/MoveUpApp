@@ -89,3 +89,10 @@ http://10.0.2.2:5013 quando usar esse arquivo. Sem o arquivo, o padrão é autom
 Execução, descanso, retomada e histórico usam um contrato separado de sessões.
 Consulte [phase-2-session-api.md](phase-2-session-api.md) para as rotas implementadas,
 os modelos e como testar sem o Back da fase 2.
+
+## Front da fase 3
+
+Calendário, rotina, meta semanal e painel de consistência usam as rotas de
+`/api/acompanhamento`. Consulte [phase-3-consistency-plan.md](phase-3-consistency-plan.md)
+para regras, contrato implementado, execução e validação. Essa fase requer o modo
+API; o modo preview de fichas/sessões não apresenta métricas do servidor.

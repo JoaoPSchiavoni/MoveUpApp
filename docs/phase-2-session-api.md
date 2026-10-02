@@ -23,17 +23,21 @@ a retomada após reinício usa `GET /api/sessoes/ativa`. Não existe fila offlin
 | Task | Implementação |
 |---|---|
 | FRONT-11 | Iniciar nos detalhes e no treino de hoje; ações bloqueadas enquanto carregam/salvam |
-| FRONT-12 | Execução com exercícios selecionáveis, progresso, próximo exercício e botões grandes |
+| FRONT-12 | Execução sequencial de séries, progresso, avanço para o próximo exercício após concluir ou pular todas as séries |
 | FRONT-13 | Carga e repetições realizadas; concluir, pular e corrigir séries; estado salvo somente após confirmação |
-| FRONT-14 | Descanso por horário absoluto, reiniciar/pular e atualização ao voltar do segundo plano |
+| FRONT-14 | Contagem circular de descanso em tela cheia, bloqueando a ficha; retorno automático ao fim do tempo, opção para pular e atualização ao voltar do segundo plano |
 | FRONT-15 | Banner de sessão ativa, continuar na Home e recuperação do progresso confirmado pela API |
 | FRONT-16 | Finalização confirmada, aviso sobre séries pendentes, observação e resumo |
 | FRONT-17 | Histórico de concluídos, detalhes, paginação, estado vazio, erros e atualização por gesto |
 | FRONT-18 | Cancelamento explícito; valores mantidos após falha e repetição de operações com IDs estáveis |
 
-O cronômetro visual não envia notificações com o app fechado. Seu prazo é mantido
-na memória do Front entre telas e durante suspensão; reiniciar o app não restaura
-um descanso antigo. Séries já confirmadas serão recuperadas do Back.
+O cronômetro circular de descanso ocupa a tela inteira e impede interações com a
+ficha até o tempo acabar ou o usuário tocar em “Pular descanso”. Cada série é
+liberada depois da anterior; concluir uma série inicia o descanso configurado e,
+ao terminar, retorna à próxima série. Pular uma série avança sem iniciar descanso.
+O cronômetro não envia notificações com o app fechado. Seu prazo é mantido na
+memória do Front entre telas e durante suspensão; reiniciar o app não restaura um
+descanso antigo. Séries já confirmadas serão recuperadas do Back.
 
 Rascunhos dos campos permanecem enquanto o app está aberto, inclusive ao trocar de
 exercício ou sair da tela. Ao encerrar o processo, apenas dados confirmados pela

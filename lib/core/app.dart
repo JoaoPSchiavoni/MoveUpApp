@@ -10,11 +10,20 @@ import '../features/session/domain/session.dart';
 import '../features/session/data/api_session_gateway.dart';
 import '../features/session/data/preview_session_gateway.dart';
 import '../features/session/presentation/session_store.dart';
+import '../features/consistency/domain/consistency.dart';
+import '../features/consistency/data/api_consistency_gateway.dart';
+import '../features/consistency/presentation/consistency_store.dart';
 
 class MoveUpApp extends StatefulWidget {
-  const MoveUpApp({super.key, this.gateway, this.sessionGateway});
+  const MoveUpApp({
+    super.key,
+    this.gateway,
+    this.sessionGateway,
+    this.consistencyGateway,
+  });
   final WorkoutGateway? gateway;
   final SessionGateway? sessionGateway;
+  final ConsistencyGateway? consistencyGateway;
   @override
   State<MoveUpApp> createState() => _MoveUpAppState();
 }
@@ -27,6 +36,14 @@ class _MoveUpAppState extends State<MoveUpApp> {
           ? PreviewSessionGateway()
           : ApiSessionGateway(baseUrl: _apiUrl));
   late final SessionStore sessions = SessionStore(sessionGateway);
+  late final ConsistencyGateway consistencyGateway =
+      widget.consistencyGateway ??
+      (gateway is PreviewWorkoutGateway
+          ? UnavailableConsistencyGateway()
+          : ApiConsistencyGateway(baseUrl: _apiUrl));
+  late final ConsistencyStore consistency = ConsistencyStore(
+    consistencyGateway,
+  );
   String get _apiUrl {
     const configured = String.fromEnvironment('API_BASE_URL');
     if (configured.isNotEmpty) return configured;
@@ -48,6 +65,11 @@ class _MoveUpAppState extends State<MoveUpApp> {
       (gateway as ApiWorkoutGateway).close();
     }
     sessions.dispose();
+    consistency.dispose();
+    if (widget.consistencyGateway == null &&
+        consistencyGateway is ApiConsistencyGateway) {
+      (consistencyGateway as ApiConsistencyGateway).close();
+    }
     if (widget.sessionGateway == null && sessionGateway is ApiSessionGateway) {
       (sessionGateway as ApiSessionGateway).close();
     }
@@ -69,6 +91,10 @@ class _MoveUpAppState extends State<MoveUpApp> {
       ),
       appBarTheme: const AppBarTheme(backgroundColor: Color(0xfff6f7f3)),
     ),
-    home: WorkoutHome(gateway: gateway, sessions: sessions),
+    home: WorkoutHome(
+      gateway: gateway,
+      sessions: sessions,
+      consistency: consistency,
+    ),
   );
 }

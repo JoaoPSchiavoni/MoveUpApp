@@ -26,12 +26,14 @@ class WorkoutPlan {
     required this.name,
     required this.weekday,
     this.description = '',
+    this.active = true,
     required List<WorkoutItem> items,
   }) : items = List.unmodifiable(items);
   final String id;
   final String name;
   final int weekday;
   final String description;
+  final bool active;
   final List<WorkoutItem> items;
 }
 

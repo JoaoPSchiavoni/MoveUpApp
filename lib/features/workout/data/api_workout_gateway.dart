@@ -61,6 +61,7 @@ class ApiWorkoutGateway implements WorkoutGateway {
       name: json['nome'] as String,
       weekday: json['diaSemana'] as int,
       description: json['descricao'] as String? ?? '',
+      active: json['ativo'] as bool? ?? true,
       items: items
           .map(
             (item) => WorkoutItem(
@@ -91,6 +92,7 @@ class ApiWorkoutGateway implements WorkoutGateway {
       'nome': workout.name,
       'diaSemana': workout.weekday,
       'descricao': workout.description,
+      'ativo': workout.active,
       'exercicios': workout.items
           .map(
             (item) => {

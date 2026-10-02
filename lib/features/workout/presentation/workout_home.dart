@@ -5,25 +5,56 @@ import 'workout_editor.dart';
 import '../../session/presentation/session_store.dart';
 import '../../session/presentation/session_page.dart';
 import '../../session/presentation/session_history.dart';
+import '../../consistency/presentation/consistency_store.dart';
+import '../../consistency/presentation/consistency_page.dart';
 
 class WorkoutHome extends StatefulWidget {
-  const WorkoutHome({super.key, required this.gateway, required this.sessions});
+  const WorkoutHome({
+    super.key,
+    required this.gateway,
+    required this.sessions,
+    this.consistency,
+  });
   final WorkoutGateway gateway;
   final SessionStore sessions;
+  final ConsistencyStore? consistency;
   @override
   State<WorkoutHome> createState() => _WorkoutHomeState();
 }
 
-class _WorkoutHomeState extends State<WorkoutHome> {
+class _WorkoutHomeState extends State<WorkoutHome> with WidgetsBindingObserver {
   List<WorkoutPlan> workouts = [];
   bool loading = true;
   String? error;
   int tab = 0;
+  int completionRevision = 0;
+  void sessionChanged() {
+    if (completionRevision == widget.sessions.completionRevision) return;
+    completionRevision = widget.sessions.completionRevision;
+    widget.consistency?.refresh();
+  }
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    completionRevision = widget.sessions.completionRevision;
+    widget.sessions.addListener(sessionChanged);
+    widget.consistency?.refresh();
     widget.sessions.refresh();
     reload();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) widget.consistency?.refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.sessions.removeListener(sessionChanged);
+    super.dispose();
   }
 
   Future<void> reload() async {
@@ -97,7 +128,17 @@ class _WorkoutHomeState extends State<WorkoutHome> {
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
-      body: tab == 2
+      body: tab == 3 && widget.consistency != null
+          ? ConsistencyPage(
+              store: widget.consistency!,
+              sessions: widget.sessions.gateway,
+              suggested: workouts
+                  .where((w) => w.active)
+                  .map((w) => w.weekday)
+                  .toSet()
+                  .toList(),
+            )
+          : tab == 2
           ? SessionHistory(gateway: widget.sessions.gateway)
           : Center(
               child: ConstrainedBox(
@@ -122,6 +163,8 @@ class _WorkoutHomeState extends State<WorkoutHome> {
                           await Future.wait([
                             reload(),
                             widget.sessions.refresh(),
+                            if (widget.consistency != null)
+                              widget.consistency!.refresh(),
                           ]);
                         },
                         child: ListView(
@@ -144,6 +187,17 @@ class _WorkoutHomeState extends State<WorkoutHome> {
                             ActiveSessionBanner(store: widget.sessions),
                             const SizedBox(height: 16),
                             if (tab == 0) ...[
+                              if (widget.consistency != null) ...[
+                                ConsistencyOverview(
+                                  store: widget.consistency!,
+                                  suggested: workouts
+                                      .where((w) => w.active)
+                                      .map((w) => w.weekday)
+                                      .toSet()
+                                      .toList(),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
                               Container(
                                 padding: const EdgeInsets.all(24),
                                 decoration: BoxDecoration(
@@ -249,7 +303,7 @@ class _WorkoutHomeState extends State<WorkoutHome> {
                       ),
               ),
             ),
-      floatingActionButton: tab == 2
+      floatingActionButton: tab >= 2
           ? null
           : FloatingActionButton.extended(
               onPressed: () => edit(),
@@ -270,6 +324,11 @@ class _WorkoutHomeState extends State<WorkoutHome> {
             label: 'Meus treinos',
           ),
           NavigationDestination(icon: Icon(Icons.history), label: 'Histórico'),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month),
+            label: 'Calendário',
+          ),
         ],
       ),
     );

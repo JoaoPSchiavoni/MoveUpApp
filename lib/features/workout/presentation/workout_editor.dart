@@ -74,6 +74,7 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
     name: name.text.trim(),
     weekday: weekday!,
     description: description.text.trim(),
+    active: widget.initial?.active ?? true,
     items: selected.map((item) => item.toItem()).toList(),
   );
   Future<void> next() async {

@@ -25,6 +25,8 @@ class SessionStore extends ChangeNotifier {
   final Map<String, SetDraft> drafts = {};
   DateTime? restEndsAt;
   int lastRestSeconds = 0;
+  int currentExerciseIndex = 0;
+  int completionRevision = 0;
   String noteDraft = '';
   bool _disposed = false;
   void _notify() {
@@ -37,6 +39,22 @@ class SessionStore extends ChangeNotifier {
   SetDraft draft(SessionSet set) =>
       drafts.putIfAbsent(set.id, () => SetDraft(set));
   bool get hasUnsaved => drafts.values.any((d) => d.dirty);
+  int get restDurationSeconds => lastRestSeconds;
+  double get restProgress => lastRestSeconds == 0
+      ? 0
+      : (1 - remainingRest / lastRestSeconds).clamp(0.0, 1.0);
+  bool canAdvanceFrom(SessionExercise exercise) =>
+      exercise.sets.every((set) => set.status != SetStatus.pending);
+  void advanceToNextExercise() {
+    if (active == null ||
+        currentExerciseIndex >= active!.exercises.length - 1) {
+      return;
+    }
+    if (!canAdvanceFrom(active!.exercises[currentExerciseIndex])) return;
+    currentExerciseIndex++;
+    _notify();
+  }
+
   int get remainingRest {
     if (restEndsAt == null) return 0;
     final milliseconds = restEndsAt!.difference(now()).inMilliseconds;
@@ -44,7 +62,7 @@ class SessionStore extends ChangeNotifier {
   }
 
   void startRest(int seconds) {
-    lastRestSeconds = seconds;
+    lastRestSeconds = seconds > 0 ? seconds : 0;
     restEndsAt = seconds > 0 ? now().add(Duration(seconds: seconds)) : null;
     _notify();
   }
@@ -62,6 +80,7 @@ class SessionStore extends ChangeNotifier {
       drafts.clear();
       restEndsAt = null;
       lastRestSeconds = 0;
+      currentExerciseIndex = 0;
       noteDraft = '';
     }
     active = value?.status == SessionStatus.active ? value : null;
@@ -170,6 +189,7 @@ class SessionStore extends ChangeNotifier {
           ? await gateway.cancel(active!.id)
           : await gateway.finish(active!.id, noteDraft.trim());
       _accept(null);
+      if (!cancel) completionRevision++;
       return value;
     } catch (e) {
       error = message(e);

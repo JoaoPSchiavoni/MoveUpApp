@@ -120,7 +120,6 @@ class SessionPageView extends StatefulWidget {
 }
 
 class _SessionPageViewState extends State<SessionPageView> {
-  int exerciseIndex = 0;
   SessionStore get store => widget.store;
   Future<void> finish() async {
     final session = store.active!;
@@ -171,119 +170,134 @@ class _SessionPageViewState extends State<SessionPageView> {
       if (session == null) {
         return const Scaffold(body: Center(child: Text('Sessão encerrada.')));
       }
+      final resting = store.restEndsAt != null && store.remainingRest > 0;
+      if (store.restEndsAt != null && store.remainingRest == 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && store.restEndsAt != null && store.remainingRest == 0) {
+            store.skipRest();
+          }
+        });
+      }
       final exercise = session.exercises.isEmpty
           ? null
-          : session.exercises[exerciseIndex.clamp(
+          : session.exercises[store.currentExerciseIndex.clamp(
               0,
               session.exercises.length - 1,
             )];
       final resolved = session.completed + session.skipped;
-      return Scaffold(
-        appBar: AppBar(title: const Text('Treino em andamento')),
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 850),
-            child: ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                Text(
-                  session.name,
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${session.completed} concluídas · ${session.skipped} puladas · ${session.pending} pendentes',
-                ),
-                const SizedBox(height: 8),
-                LinearProgressIndicator(
-                  value: session.sets.isEmpty
-                      ? 0
-                      : resolved / session.sets.length,
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Você pode sair desta tela e continuar o treino depois.',
-                ),
-                const SizedBox(height: 16),
-                RestPanel(store: store),
-                if (store.error != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Semantics(
-                      liveRegion: true,
-                      child: Text(
-                        store.error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+      return PopScope(
+        canPop: !resting,
+        child: Scaffold(
+          appBar: resting
+              ? null
+              : AppBar(title: const Text('Treino em andamento')),
+          body: resting
+              ? RestFullscreen(store: store)
+              : Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 850),
+                    child: ListView(
+                      padding: const EdgeInsets.all(20),
+                      children: [
+                        Text(
+                          session.name,
+                          style: Theme.of(context).textTheme.headlineMedium,
                         ),
-                      ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${session.completed} concluídas · ${session.skipped} puladas · ${session.pending} pendentes',
+                        ),
+                        const SizedBox(height: 8),
+                        LinearProgressIndicator(
+                          value: session.sets.isEmpty
+                              ? 0
+                              : resolved / session.sets.length,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Você pode sair desta tela e continuar o treino depois.',
+                        ),
+                        const SizedBox(height: 16),
+                        if (store.error != null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Semantics(
+                              liveRegion: true,
+                              child: Text(
+                                store.error!,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (store.busy)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            child: LinearProgressIndicator(),
+                          ),
+                        const SizedBox(height: 16),
+                        if (exercise != null) ...[
+                          const SizedBox(height: 24),
+                          Text(
+                            'Exercício ${store.currentExerciseIndex + 1} de ${session.exercises.length}',
+                            style: Theme.of(context).textTheme.labelLarge,
+                          ),
+                          Text(
+                            exercise.name,
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
+                          Text(
+                            '${exercise.group} · Descanso: ${exercise.restSeconds}s',
+                          ),
+                          const SizedBox(height: 12),
+                          for (final set in exercise.sets)
+                            _SetCard(
+                              key: ValueKey(set.id),
+                              set: set,
+                              store: store,
+                              restSeconds: exercise.restSeconds,
+                              locked:
+                                  set.status == SetStatus.pending &&
+                                  exercise.sets.any(
+                                    (previous) =>
+                                        previous.order < set.order &&
+                                        previous.status == SetStatus.pending,
+                                  ),
+                            ),
+                          if (store.currentExerciseIndex <
+                                  session.exercises.length - 1 &&
+                              store.canAdvanceFrom(exercise))
+                            OutlinedButton.icon(
+                              onPressed: store.busy
+                                  ? null
+                                  : store.advanceToNextExercise,
+                              icon: const Icon(Icons.arrow_forward),
+                              label: Text(
+                                'Próximo exercício · ${session.exercises[store.currentExerciseIndex + 1].name}',
+                              ),
+                            ),
+                        ],
+                        const SizedBox(height: 24),
+                        if (session.completed == 0)
+                          const Text(
+                            'Conclua pelo menos uma série para finalizar o treino.',
+                          ),
+                        FilledButton.icon(
+                          onPressed: store.busy || session.completed == 0
+                              ? null
+                              : finish,
+                          icon: const Icon(Icons.check),
+                          label: const Text('Finalizar treino'),
+                        ),
+                        TextButton(
+                          onPressed: store.busy ? null : cancel,
+                          child: const Text('Cancelar treino'),
+                        ),
+                      ],
                     ),
                   ),
-                if (store.busy)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: LinearProgressIndicator(),
-                  ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (var i = 0; i < session.exercises.length; i++)
-                      ChoiceChip(
-                        label: Text('${i + 1}. ${session.exercises[i].name}'),
-                        selected: exerciseIndex == i,
-                        onSelected: store.busy
-                            ? null
-                            : (_) => setState(() => exerciseIndex = i),
-                      ),
-                  ],
                 ),
-                if (exercise != null) ...[
-                  const SizedBox(height: 24),
-                  Text(
-                    exercise.name,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  Text(
-                    '${exercise.group} · Descanso: ${exercise.restSeconds}s',
-                  ),
-                  const SizedBox(height: 12),
-                  for (final set in exercise.sets)
-                    _SetCard(
-                      key: ValueKey(set.id),
-                      set: set,
-                      store: store,
-                      restSeconds: exercise.restSeconds,
-                    ),
-                  if (exerciseIndex < session.exercises.length - 1)
-                    OutlinedButton.icon(
-                      onPressed: store.busy
-                          ? null
-                          : () => setState(() => exerciseIndex++),
-                      icon: const Icon(Icons.arrow_forward),
-                      label: const Text('Próximo exercício'),
-                    ),
-                ],
-                const SizedBox(height: 24),
-                if (session.completed == 0)
-                  const Text(
-                    'Conclua pelo menos uma série para finalizar o treino.',
-                  ),
-                FilledButton.icon(
-                  onPressed: store.busy || session.completed == 0
-                      ? null
-                      : finish,
-                  icon: const Icon(Icons.check),
-                  label: const Text('Finalizar treino'),
-                ),
-                TextButton(
-                  onPressed: store.busy ? null : cancel,
-                  child: const Text('Cancelar treino'),
-                ),
-              ],
-            ),
-          ),
         ),
       );
     },
@@ -296,10 +310,12 @@ class _SetCard extends StatefulWidget {
     required this.set,
     required this.store,
     required this.restSeconds,
+    required this.locked,
   });
   final SessionSet set;
   final SessionStore store;
   final int restSeconds;
+  final bool locked;
   @override
   State<_SetCard> createState() => _SetCardState();
 }
@@ -348,7 +364,10 @@ class _SetCardState extends State<_SetCard> {
               'Planejado: ${set.plannedReps} repetições · ${number(set.plannedWeight)} kg',
             ),
             const SizedBox(height: 12),
-            if (set.status == SetStatus.pending) ...[
+            if (set.status == SetStatus.pending && widget.locked) ...[
+              const SizedBox(height: 8),
+              const Text('Disponível após concluir ou pular a série anterior.'),
+            ] else if (set.status == SetStatus.pending) ...[
               LayoutBuilder(
                 builder: (context, box) {
                   final width = box.maxWidth >= 320
@@ -391,23 +410,28 @@ class _SetCardState extends State<_SetCard> {
                 },
               ),
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                children: [
-                  FilledButton.icon(
-                    onPressed: widget.store.busy
-                        ? null
-                        : () => record(SetStatus.completed),
-                    icon: const Icon(Icons.check),
-                    label: const Text('Concluir série'),
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: widget.store.busy
+                          ? null
+                          : () => record(SetStatus.completed),
+                      icon: const Icon(Icons.check),
+                      label: const Text('Concluir série'),
+                    ),
                   ),
-                  TextButton(
-                    onPressed: widget.store.busy
-                        ? null
-                        : () => record(SetStatus.skipped),
-                    child: const Text('Pular série'),
-                  ),
-                ],
+                ),
+              ),
+              Center(
+                child: TextButton(
+                  onPressed: widget.store.busy
+                      ? null
+                      : () => record(SetStatus.skipped),
+                  child: const Text('Pular série'),
+                ),
               ),
             ] else ...[
               Text(
@@ -431,74 +455,210 @@ class _SetCardState extends State<_SetCard> {
   }
 }
 
-class RestPanel extends StatefulWidget {
-  const RestPanel({super.key, required this.store});
+class RestFullscreen extends StatefulWidget {
+  const RestFullscreen({super.key, required this.store});
   final SessionStore store;
   @override
-  State<RestPanel> createState() => _RestPanelState();
+  State<RestFullscreen> createState() => _RestFullscreenState();
 }
 
-class _RestPanelState extends State<RestPanel> with WidgetsBindingObserver {
-  Timer? timer;
+class _RestFullscreenState extends State<RestFullscreen>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  Timer? ticker;
+  late final AnimationController ring;
+
+  void syncRing() {
+    final deadline = widget.store.restEndsAt;
+    final total = widget.store.lastRestSeconds * Duration.microsecondsPerSecond;
+    if (deadline == null || total <= 0) return;
+    final remaining = deadline.difference(widget.store.now()).inMicroseconds;
+    ring.stop();
+    ring.value = (1 - remaining / total).clamp(0.0, 1.0);
+    if (remaining > 0) {
+      ring.animateTo(
+        1,
+        duration: Duration(microseconds: remaining),
+        curve: Curves.linear,
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    ring = AnimationController(vsync: this);
+    syncRing();
     WidgetsBinding.instance.addObserver(this);
-    timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && widget.store.restEndsAt != null) setState(() {});
+    ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (widget.store.remainingRest == 0) {
+        widget.store.skipRest();
+      } else {
+        setState(() {});
+      }
     });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) setState(() {});
+    if (state != AppLifecycleState.resumed || !mounted) return;
+    if (widget.store.remainingRest == 0) {
+      widget.store.skipRest();
+    } else {
+      syncRing();
+      setState(() {});
+    }
   }
 
   @override
   void dispose() {
-    timer?.cancel();
+    ticker?.cancel();
+    ring.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
+  String get clockText {
+    final remaining = widget.store.remainingRest;
+    final minutes = (remaining ~/ 60).toString().padLeft(2, '0');
+    final seconds = (remaining % 60).toString().padLeft(2, '0');
+    if (remaining >= 3600) {
+      return '${(remaining ~/ 3600).toString().padLeft(2, '0')}:$minutes:$seconds';
+    }
+    return '$minutes:$seconds';
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (widget.store.lastRestSeconds == 0) return const SizedBox.shrink();
-    final remaining = widget.store.remainingRest;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xffe1eee4),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            remaining == 0
-                ? 'Pronto para a próxima série'
-                : 'Descanso · ${(remaining ~/ 60).toString().padLeft(2, '0')}:${(remaining % 60).toString().padLeft(2, '0')}',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          Wrap(
-            spacing: 12,
+    final colors = Theme.of(context).colorScheme;
+    final diameter = (MediaQuery.sizeOf(context).shortestSide * .82).clamp(
+      220.0,
+      340.0,
+    );
+    return SizedBox.expand(
+      child: ColoredBox(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        child: SafeArea(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (remaining > 0)
-                TextButton(
-                  onPressed: widget.store.skipRest,
-                  child: const Text('Pular descanso'),
+              const Spacer(),
+              Text(
+                'DESCANSO',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
+                  letterSpacing: 3,
+                  fontWeight: FontWeight.w600,
                 ),
-              TextButton(
-                onPressed: () =>
-                    widget.store.startRest(widget.store.lastRestSeconds),
-                child: const Text('Reiniciar descanso'),
+              ),
+              const SizedBox(height: 28),
+              SizedBox.square(
+                dimension: diameter,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CustomPaint(
+                      size: Size.square(diameter),
+                      painter: _RestRingPainter(
+                        progress: ring,
+                        color: colors.primary,
+                        trackColor: colors.outlineVariant,
+                      ),
+                    ),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          clockText,
+                          style: TextStyle(
+                            color: colors.onSurface,
+                            fontSize: diameter * .17,
+                            fontWeight: FontWeight.w600,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'até a próxima série',
+                          style: TextStyle(color: colors.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 58,
+                  child: FilledButton(
+                    onPressed: widget.store.skipRest,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colors.primary,
+                      foregroundColor: colors.onPrimary,
+                    ),
+                    child: const Text(
+                      'Pular descanso',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
+}
+
+class _RestRingPainter extends CustomPainter {
+  _RestRingPainter({
+    required this.progress,
+    required this.color,
+    required this.trackColor,
+  }) : super(repaint: progress);
+  final Animation<double> progress;
+  final Color color;
+  final Color trackColor;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final stroke = size.shortestSide * .035;
+    final rect =
+        Offset(stroke / 2, stroke / 2) &
+        Size(size.width - stroke, size.height - stroke);
+    final track = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke;
+    final arc = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawCircle(center, rect.width / 2, track);
+    if (progress.value > 0) {
+      canvas.drawArc(
+        rect,
+        -1.5707963267948966,
+        6.283185307179586 * progress.value,
+        false,
+        arc,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RestRingPainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.color != color ||
+      oldDelegate.trackColor != trackColor;
 }
 
 class _FinishDialog extends StatefulWidget {

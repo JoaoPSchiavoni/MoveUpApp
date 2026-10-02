@@ -8,7 +8,27 @@ import 'package:moveupapp/features/session/presentation/session_store.dart';
 
 import 'session_store_test.dart' show plan, FailingGateway;
 
+Future<void> skipRest(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 50));
+  expect(find.text('Pular descanso'), findsOneWidget);
+  expect(find.text('Treino em andamento'), findsNothing);
+  await tester.tap(find.text('Pular descanso'));
+  await tester.pumpAndSettle();
+}
+
 Future<void> reveal(WidgetTester tester, Finder finder) async {
+  if (finder.evaluate().isEmpty) {
+    await tester.drag(
+      find
+          .byWidgetPredicate(
+            (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+          )
+          .first,
+      const Offset(0, 5000),
+    );
+    await tester.pumpAndSettle();
+  }
   for (var i = 0; i < 20 && finder.evaluate().isEmpty; i++) {
     await tester.drag(
       find
@@ -53,7 +73,7 @@ void main() {
       await tester.enterText(find.byKey(ValueKey('reps-$id')), '8');
       await reveal(tester, find.text('Concluir série'));
       await tester.tap(find.text('Concluir série').first);
-      await tester.pumpAndSettle();
+      await skipRest(tester);
       expect((await sessions.loadActive())!.completed, 1);
       expect(find.textContaining('Salva · 8 reps'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -123,13 +143,13 @@ void main() {
         '80',
       );
       await tester.tap(find.text('Concluir série').first);
-      await tester.pumpAndSettle();
+      await skipRest(tester);
       await tester.tap(find.text('Corrigir série'));
       await tester.pumpAndSettle();
       expect(store.active!.completed, 0);
       await tester.enterText(find.byKey(ValueKey('reps-$setId')), '6');
       await tester.tap(find.text('Concluir série').first);
-      await tester.pumpAndSettle();
+      await skipRest(tester);
       expect(store.active!.sets.first.reps, 6);
       await reveal(tester, find.text('Cancelar treino'));
       await tester.tap(find.text('Cancelar treino'));
