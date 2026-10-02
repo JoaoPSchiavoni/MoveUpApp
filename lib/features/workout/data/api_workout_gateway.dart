@@ -52,6 +52,7 @@ class ApiWorkoutGateway implements WorkoutGateway {
     json['id'] as String,
     json['nome'] as String,
     json['grupoMuscular'] as String,
+    description: json['descricao'] as String? ?? '',
   );
   WorkoutPlan _workout(Map<String, dynamic> json) {
     final items = List<Map<String, dynamic>>.from(json['exercicios'] as List)

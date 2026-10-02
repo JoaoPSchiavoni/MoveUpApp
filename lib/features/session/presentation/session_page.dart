@@ -64,7 +64,7 @@ class ActiveSessionBanner extends StatelessWidget {
       if (store.loading) return const LinearProgressIndicator();
       if (store.active != null) {
         return Card(
-          color: const Color(0xffe1eee4),
+          color: Theme.of(context).colorScheme.primaryContainer,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(

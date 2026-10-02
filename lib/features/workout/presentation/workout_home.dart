@@ -1,3 +1,12 @@
+import '../../../core/appearance.dart';
+import '../../../core/local_database.dart';
+import '../../settings/settings_page.dart';
+import '../../progress/performance_page.dart';
+import '../../progress/measurements_page.dart';
+import '../../consistency/presentation/week_strip.dart';
+import 'workout_templates.dart';
+import 'exercise_details.dart';
+
 import 'package:flutter/material.dart';
 
 import '../domain/workout_gateway.dart';
@@ -14,10 +23,16 @@ class WorkoutHome extends StatefulWidget {
     required this.gateway,
     required this.sessions,
     this.consistency,
+    this.appearance,
+    this.local,
+    this.apiUrl = 'http://localhost:5013',
   });
   final WorkoutGateway gateway;
   final SessionStore sessions;
   final ConsistencyStore? consistency;
+  final Appearance? appearance;
+  final LocalData? local;
+  final String apiUrl;
   @override
   State<WorkoutHome> createState() => _WorkoutHomeState();
 }
@@ -28,6 +43,10 @@ class _WorkoutHomeState extends State<WorkoutHome> with WidgetsBindingObserver {
   String? error;
   int tab = 0;
   int completionRevision = 0;
+  void consistencyChanged() {
+    if (mounted) setState(() {});
+  }
+
   void sessionChanged() {
     if (completionRevision == widget.sessions.completionRevision) return;
     completionRevision = widget.sessions.completionRevision;
@@ -40,6 +59,7 @@ class _WorkoutHomeState extends State<WorkoutHome> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     completionRevision = widget.sessions.completionRevision;
     widget.sessions.addListener(sessionChanged);
+    widget.consistency?.addListener(consistencyChanged);
     widget.consistency?.refresh();
     widget.sessions.refresh();
     reload();
@@ -54,6 +74,7 @@ class _WorkoutHomeState extends State<WorkoutHome> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.sessions.removeListener(sessionChanged);
+    widget.consistency?.removeListener(consistencyChanged);
     super.dispose();
   }
 
@@ -119,10 +140,39 @@ class _WorkoutHomeState extends State<WorkoutHome> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final today = workouts
-        .where((w) => w.weekday == DateTime.now().weekday)
+        .where(
+          (w) =>
+              w.active &&
+              w.weekday ==
+                  (widget.consistency?.panel?.today ?? DateTime.now()).weekday,
+        )
         .toList();
     return Scaffold(
       appBar: AppBar(
+        actions: [
+          if (widget.appearance != null)
+            IconButton(
+              tooltip: 'Preferências',
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SettingsPage(
+                      appearance: widget.appearance!,
+                      local: widget.local,
+                      apiUrl: widget.apiUrl,
+                    ),
+                  ),
+                );
+                if (mounted) {
+                  await reload();
+                  await widget.sessions.refresh();
+                  await widget.consistency?.refresh();
+                }
+              },
+            ),
+        ],
         title: const Text(
           'MoveUp',
           style: TextStyle(fontWeight: FontWeight.w800),
@@ -171,9 +221,7 @@ class _WorkoutHomeState extends State<WorkoutHome> with WidgetsBindingObserver {
                           padding: const EdgeInsets.fromLTRB(24, 20, 24, 100),
                           children: [
                             Text(
-                              tab == 0
-                                  ? 'Seu próximo passo começa aqui.'
-                                  : 'Meus treinos',
+                              tab == 0 ? 'Vamos treinar?' : 'Meus treinos',
                               style: Theme.of(context).textTheme.headlineMedium
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
@@ -188,15 +236,11 @@ class _WorkoutHomeState extends State<WorkoutHome> with WidgetsBindingObserver {
                             const SizedBox(height: 16),
                             if (tab == 0) ...[
                               if (widget.consistency != null) ...[
-                                ConsistencyOverview(
+                                WeekStrip(
                                   store: widget.consistency!,
-                                  suggested: workouts
-                                      .where((w) => w.active)
-                                      .map((w) => w.weekday)
-                                      .toSet()
-                                      .toList(),
+                                  onCalendar: () => setState(() => tab = 3),
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 20),
                               ],
                               Container(
                                 padding: const EdgeInsets.all(24),
@@ -216,7 +260,13 @@ class _WorkoutHomeState extends State<WorkoutHome> with WidgetsBindingObserver {
                                     ),
                                     const SizedBox(height: 12),
                                     Text(
-                                      weekdays[DateTime.now().weekday - 1],
+                                      weekdays[(widget
+                                                      .consistency
+                                                      ?.panel
+                                                      ?.today ??
+                                                  DateTime.now())
+                                              .weekday -
+                                          1],
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 24,
@@ -264,6 +314,76 @@ class _WorkoutHomeState extends State<WorkoutHome> with WidgetsBindingObserver {
                                   ],
                                 ),
                               ),
+                              const SizedBox(height: 20),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  ActionChip(
+                                    avatar: const Icon(
+                                      Icons.playlist_add,
+                                      size: 18,
+                                    ),
+                                    label: const Text('Treinos prontos'),
+                                    onPressed: () async {
+                                      final added = await Navigator.push<bool>(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => WorkoutTemplatesPage(
+                                            gateway: widget.gateway,
+                                          ),
+                                        ),
+                                      );
+                                      if (added == true && mounted) {
+                                        await reload();
+                                      }
+                                    },
+                                  ),
+                                  ActionChip(
+                                    avatar: const Icon(
+                                      Icons.insights,
+                                      size: 18,
+                                    ),
+                                    label: const Text('Evolução'),
+                                    onPressed: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => PerformancePage(
+                                          gateway: widget.sessions.gateway,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (widget.local != null)
+                                    ActionChip(
+                                      avatar: const Icon(
+                                        Icons.straighten,
+                                        size: 18,
+                                      ),
+                                      label: const Text('Medidas'),
+                                      onPressed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => MeasurementsPage(
+                                            data: widget.local!,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              if (widget.consistency != null) ...[
+                                ConsistencyOverview(
+                                  store: widget.consistency!,
+                                  suggested: workouts
+                                      .where((w) => w.active)
+                                      .map((w) => w.weekday)
+                                      .toSet()
+                                      .toList(),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
                               const SizedBox(height: 28),
                               Text(
                                 'Seus treinos',
@@ -457,6 +577,8 @@ class WorkoutSummary extends StatelessWidget {
           child: ListTile(
             leading: CircleAvatar(child: Text('${index + 1}')),
             title: Text(workout.items[index].exercise.name),
+            trailing: const Icon(Icons.info_outline),
+            onTap: () => openExercise(context, workout.items[index].exercise),
             subtitle: Text(
               '${workout.items[index].sets} séries × ${workout.items[index].reps} repetições\n${workout.items[index].weight} kg · ${workout.items[index].restSeconds}s de descanso',
             ),

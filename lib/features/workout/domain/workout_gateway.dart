@@ -1,8 +1,17 @@
 class ExerciseOption {
-  const ExerciseOption(this.id, this.name, this.group);
+  const ExerciseOption(
+    this.id,
+    this.name,
+    this.group, {
+    this.description = '',
+    this.equipment = '',
+    this.instructions = const [],
+  });
   final String id;
   final String name;
   final String group;
+  final String description, equipment;
+  final List<String> instructions;
 }
 
 class WorkoutItem {

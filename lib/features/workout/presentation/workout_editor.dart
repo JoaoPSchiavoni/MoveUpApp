@@ -1,3 +1,5 @@
+import 'exercise_details.dart';
+
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
@@ -230,7 +232,18 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
         for (final exercise in filtered)
           Card(
             child: CheckboxListTile(
-              title: Text(exercise.name),
+              title: InkWell(
+                onTap: () => openExercise(context, exercise),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(exercise.name),
+                ),
+              ),
+              secondary: IconButton(
+                tooltip: 'Detalhes do exercício',
+                icon: const Icon(Icons.info_outline),
+                onPressed: () => openExercise(context, exercise),
+              ),
               subtitle: Text(exercise.group),
               value: selected.any((e) => e.exercise.id == exercise.id),
               onChanged: (value) => setState(() {
@@ -293,6 +306,12 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
                           '${i + 1}. ${selected[i].exercise.name}',
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
+                      ),
+                      IconButton(
+                        tooltip: 'Detalhes do exercício',
+                        icon: const Icon(Icons.info_outline),
+                        onPressed: () =>
+                            openExercise(context, selected[i].exercise),
                       ),
                       IconButton(
                         tooltip: 'Mover para cima',

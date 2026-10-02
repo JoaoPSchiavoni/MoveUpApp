@@ -85,6 +85,7 @@ class ApiSessionGateway implements SessionGateway {
       }).toList()..sort((a, b) => a.order.compareTo(b.order));
       return SessionExercise(
         id: e['id'] as String,
+        originId: e['exercicioOrigemId'] as String?,
         name: e['nome'] as String,
         group: e['grupoMuscular'] as String,
         order: e['ordem'] as int,
@@ -94,6 +95,9 @@ class ApiSessionGateway implements SessionGateway {
     }).toList()..sort((a, b) => a.order.compareTo(b.order));
     return TrainingSession(
       id: json['id'] as String,
+      workoutId: (json['treinoOrigemId'] ?? json['treinoId']) as String?,
+      localDate: json['dataPresenca'] as String?,
+      timeZone: json['fusoPresenca'] as String?,
       name: json['nomeTreino'] as String,
       startedAt: DateTime.parse(json['inicio'] as String),
       endedAt: json['fim'] == null

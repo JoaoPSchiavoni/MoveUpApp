@@ -29,7 +29,7 @@ void main() {
     await tester.tap(find.text('Continuar'));
     await tester.pumpAndSettle();
     expect(find.text('Selecione pelo menos um exercício.'), findsOneWidget);
-    await tester.tap(find.text('Supino reto'));
+    await tester.tap(find.byType(Checkbox).first);
     await tester.tap(find.text('Continuar'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).first, '0');

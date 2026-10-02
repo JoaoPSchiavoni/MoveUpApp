@@ -40,8 +40,10 @@ class SessionExercise {
     required this.order,
     required this.restSeconds,
     required List<SessionSet> sets,
+    this.originId,
   }) : sets = List.unmodifiable(sets);
   final String id, name, group;
+  final String? originId;
   final int order, restSeconds;
   final List<SessionSet> sets;
   SessionExercise withSets(List<SessionSet> value) => SessionExercise(
@@ -51,6 +53,7 @@ class SessionExercise {
     order: order,
     restSeconds: restSeconds,
     sets: value,
+    originId: originId,
   );
 }
 
@@ -63,8 +66,12 @@ class TrainingSession {
     this.endedAt,
     this.status = SessionStatus.active,
     this.note = '',
+    this.workoutId,
+    this.localDate,
+    this.timeZone,
   }) : exercises = List.unmodifiable(exercises);
   final String id, name, note;
+  final String? workoutId, localDate, timeZone;
   final DateTime startedAt;
   final DateTime? endedAt;
   final SessionStatus status;
@@ -93,6 +100,9 @@ class TrainingSession {
     status: status ?? this.status,
     endedAt: endedAt ?? this.endedAt,
     note: note ?? this.note,
+    workoutId: workoutId,
+    localDate: localDate,
+    timeZone: timeZone,
   );
 }
 

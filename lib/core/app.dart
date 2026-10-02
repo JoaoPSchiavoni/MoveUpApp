@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:timezone/data/latest_all.dart' as tzdata;
+
+import 'local_database.dart';
+import 'local_gateways.dart';
+import 'appearance.dart';
 
 import 'package:flutter/foundation.dart';
 
@@ -29,16 +34,35 @@ class MoveUpApp extends StatefulWidget {
 }
 
 class _MoveUpAppState extends State<MoveUpApp> {
+  late final LocalData? local = widget.gateway is LocalWorkoutGateway
+      ? (widget.gateway as LocalWorkoutGateway).data
+      : widget.gateway == null &&
+            !const bool.fromEnvironment('USE_PREVIEW') &&
+            !const bool.fromEnvironment('USE_REMOTE_API')
+      ? LocalData(MoveUpDatabase())
+      : null;
+  late final Appearance appearance = Appearance(local);
+  @override
+  void initState() {
+    super.initState();
+    tzdata.initializeTimeZones();
+    appearance.load();
+  }
+
   late final WorkoutGateway gateway = widget.gateway ?? _defaultGateway();
   late final SessionGateway sessionGateway =
       widget.sessionGateway ??
-      (gateway is PreviewWorkoutGateway
+      (gateway is LocalWorkoutGateway
+          ? LocalSessionGateway(local!)
+          : gateway is PreviewWorkoutGateway
           ? PreviewSessionGateway()
           : ApiSessionGateway(baseUrl: _apiUrl));
   late final SessionStore sessions = SessionStore(sessionGateway);
   late final ConsistencyGateway consistencyGateway =
       widget.consistencyGateway ??
-      (gateway is PreviewWorkoutGateway
+      (gateway is LocalWorkoutGateway
+          ? LocalConsistencyGateway(local!)
+          : gateway is PreviewWorkoutGateway
           ? UnavailableConsistencyGateway()
           : ApiConsistencyGateway(baseUrl: _apiUrl));
   late final ConsistencyStore consistency = ConsistencyStore(
@@ -56,7 +80,9 @@ class _MoveUpAppState extends State<MoveUpApp> {
     if (const bool.fromEnvironment('USE_PREVIEW')) {
       return PreviewWorkoutGateway();
     }
-    return ApiWorkoutGateway(baseUrl: _apiUrl);
+    return local != null
+        ? LocalWorkoutGateway(local!)
+        : ApiWorkoutGateway(baseUrl: _apiUrl);
   }
 
   @override
@@ -73,28 +99,31 @@ class _MoveUpAppState extends State<MoveUpApp> {
     if (widget.sessionGateway == null && sessionGateway is ApiSessionGateway) {
       (sessionGateway as ApiSessionGateway).close();
     }
+    appearance.dispose();
+    if (widget.gateway == null) {
+      local?.dispose();
+      local?.db.close();
+    }
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: 'MoveUp',
-    debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff236b50)),
-      scaffoldBackgroundColor: const Color(0xfff6f7f3),
-      inputDecorationTheme: const InputDecorationTheme(
-        border: OutlineInputBorder(),
-        filled: true,
-        fillColor: Colors.white,
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: appearance,
+    builder: (context, _) => MaterialApp(
+      title: 'MoveUp',
+      debugShowCheckedModeBanner: false,
+      theme: moveUpTheme(Brightness.light),
+      darkTheme: moveUpTheme(Brightness.dark),
+      themeMode: appearance.mode,
+      home: WorkoutHome(
+        gateway: gateway,
+        sessions: sessions,
+        consistency: consistency,
+        appearance: appearance,
+        local: local,
+        apiUrl: _apiUrl,
       ),
-      appBarTheme: const AppBarTheme(backgroundColor: Color(0xfff6f7f3)),
-    ),
-    home: WorkoutHome(
-      gateway: gateway,
-      sessions: sessions,
-      consistency: consistency,
     ),
   );
 }

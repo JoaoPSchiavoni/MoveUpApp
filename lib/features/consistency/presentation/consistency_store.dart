@@ -7,7 +7,7 @@ class ConsistencyStore extends ChangeNotifier {
   final ConsistencyGateway gateway;
   ConsistencyConfig? config;
   ConsistencyPanel? panel;
-  List<CalendarDay> days = [];
+  List<CalendarDay> days = [], weekDays = [];
   DateTime? month;
   bool loading = false, calendarLoading = false, disposed = false;
   String? error, calendarError;
@@ -34,6 +34,22 @@ class ConsistencyStore extends ChangeNotifier {
       config = values[0] as ConsistencyConfig;
       panel = values[1] as ConsistencyPanel;
       month ??= DateTime(panel!.today.year, panel!.today.month);
+      final start = panel!.week.start;
+      final end = panel!.week.end;
+      final months = {
+        dateKey(DateTime(start.year, start.month)),
+        dateKey(DateTime(end.year, end.month)),
+      };
+      final weeks = await Future.wait(
+        months.map((m) => gateway.calendar(DateTime.parse(m))),
+      );
+      if (disposed || request != _refreshRequest) return;
+      weekDays =
+          weeks
+              .expand((d) => d)
+              .where((d) => !d.date.isBefore(start) && !d.date.isAfter(end))
+              .toList()
+            ..sort((a, b) => a.date.compareTo(b.date));
       await loadMonth(month!);
     } catch (e) {
       if (disposed || request != _refreshRequest) return;
@@ -42,6 +58,7 @@ class ConsistencyStore extends ChangeNotifier {
       panel = null;
       config = null;
       days = [];
+      weekDays = [];
       error = message(e);
     } finally {
       if (request == _refreshRequest) {

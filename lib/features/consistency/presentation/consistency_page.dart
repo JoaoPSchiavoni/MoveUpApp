@@ -168,7 +168,7 @@ class _ConsistencyPageState extends State<ConsistencyPage> {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 8),
-                Text(day.label),
+                Text(day.onFire ? '${day.label} • OnFire' : day.label),
                 if (day.state == 'treinado' && !day.planned)
                   const Text('Treino extra: conta para a meta semanal.'),
                 if (day.state == 'falta')
@@ -341,10 +341,12 @@ class _ConsistencyPageState extends State<ConsistencyPage> {
                             dateKey(day.date) == dateKey(panel.today);
                         return Semantics(
                           label:
-                              '${shortDate(day.date)}, ${day.label}${isToday ? ', hoje' : ''}',
+                              '${shortDate(day.date)}, ${day.label}${day.onFire ? ', OnFire' : ''}${isToday ? ', hoje' : ''}',
                           button: true,
                           child: Material(
-                            color: background,
+                            color: day.onFire
+                                ? const Color(0xffffa34d)
+                                : background,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                               side: isToday
@@ -361,13 +363,23 @@ class _ConsistencyPageState extends State<ConsistencyPage> {
                                     Text(
                                       '${day.date.day}',
                                       style: TextStyle(
-                                        color: foreground,
+                                        color: day.onFire
+                                            ? const Color(0xff441700)
+                                            : foreground,
                                         fontWeight: isToday
                                             ? FontWeight.bold
                                             : FontWeight.normal,
                                       ),
                                     ),
-                                    Icon(icon, size: 14, color: foreground),
+                                    Icon(
+                                      day.onFire
+                                          ? Icons.local_fire_department
+                                          : icon,
+                                      size: 14,
+                                      color: day.onFire
+                                          ? const Color(0xff441700)
+                                          : foreground,
+                                    ),
                                   ],
                                 ),
                               ),
@@ -640,7 +652,7 @@ class _ConsistencySettingsState extends State<ConsistencySettings> {
               Text(
                 config.enabled
                     ? 'Mudanças na rotina valem no dia seguinte; na meta, na próxima segunda-feira. Alterar o fuso vale para novos treinos e preserva as datas antigas.'
-                    : 'A rotina vale a partir de hoje. Seu histórico será classificado neste fuso sem presumir faltas anteriores.',
+                    : 'A rotina vale a partir de hoje. Dias anteriores não são considerados faltas. As datas já registradas são preservadas.',
               ),
               for (final revision in config.routines.where(
                 (r) => r.start.isAfter(config.today),

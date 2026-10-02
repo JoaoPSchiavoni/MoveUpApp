@@ -28,12 +28,14 @@ class PreviewSessionGateway implements SessionGateway {
     final session = TrainingSession(
       id: id,
       name: plan.name,
+      workoutId: plan.id,
       startedAt: DateTime.now().toUtc(),
       exercises: [
         for (var i = 0; i < plan.items.length; i++)
           SessionExercise(
             id: const Uuid().v4(),
             name: plan.items[i].exercise.name,
+            originId: plan.items[i].exercise.id,
             group: plan.items[i].exercise.group,
             order: i,
             restSeconds: plan.items[i].restSeconds,

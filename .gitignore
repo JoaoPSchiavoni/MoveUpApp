@@ -65,3 +65,15 @@ app.*.map.json
 *.keystore
 key.properties
 appsettings.*.local.json
+
+# Kotlin local build cache and personal backup exports
+/android/.kotlin/
+moveup-backup-*.json
+
+# Database sidecars and personal backup exports
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.sqlite3-journal
+*.db-journal

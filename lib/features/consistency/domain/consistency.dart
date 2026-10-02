@@ -21,7 +21,10 @@ class GoalRevision {
 
 class ConsistencyConfig {
   ConsistencyConfig(Map<String, dynamic> json)
-    : enabled = json['ativado'] as bool,
+    : start = json['inicio'] == null
+          ? null
+          : DateTime.parse(json['inicio'] as String),
+      enabled = json['ativado'] as bool,
       zone = json['fuso'] as String,
       today = DateTime.parse(json['hoje'] as String),
       routines = (json['rotinas'] as List)
@@ -30,6 +33,7 @@ class ConsistencyConfig {
       goals = (json['metas'] as List)
           .map((g) => GoalRevision(Map<String, dynamic>.from(g as Map)))
           .toList();
+  final DateTime? start;
   final bool enabled;
   final String zone;
   final DateTime today;
@@ -81,7 +85,8 @@ class DaySession {
 
 class CalendarDay {
   CalendarDay(Map<String, dynamic> json)
-    : date = DateTime.parse(json['data'] as String),
+    : onFire = json['onFire'] as bool? ?? false,
+      date = DateTime.parse(json['data'] as String),
       state = json['estado'] as String,
       planned = json['planejado'] as bool,
       sessions = (json['sessoes'] as List)
@@ -89,7 +94,7 @@ class CalendarDay {
           .toList();
   final DateTime date;
   final String state;
-  final bool planned;
+  final bool planned, onFire;
   final List<DaySession> sessions;
   String get label => switch (state) {
     'treinado' => 'Treinado',
